@@ -98,6 +98,14 @@ const CONFIG = {
 };
 ```
 
+## 🐛 Troubleshooting
+
+### Events Being Updated Every Sync
+**Fixed in v1.2:** Improved description handling to prevent false positive updates due to UID-only descriptions.
+
+### Rate Limiting Issues  
+The script includes 300ms delays between calendar operations to prevent Google's rate limits.
+
 ## 🤝 Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.
