@@ -142,7 +142,9 @@ function parseEventBlock(eventBlock) {
     } else if (line.startsWith('DTEND')) {
       event.endTime = parseICSDateTime(line);
     } else if (line.startsWith('LOCATION:')) {
-      event.location = line.substring(9).trim();
+      // FIXED: Clean up escaped characters in location
+      const rawLocation = line.substring(9).trim();
+      event.location = cleanLocationString(rawLocation);
     } else if (line.startsWith('DESCRIPTION:')) {
       event.description = line.substring(12).trim();
     }
@@ -154,6 +156,20 @@ function parseEventBlock(eventBlock) {
   }
   
   return null;
+}
+
+/**
+ * Clean up location string by unescaping ICS escaped characters
+ */
+function cleanLocationString(location) {
+  if (!location) return '';
+  
+  return location
+    .replace(/\\n/g, '\n')        // Convert \n to actual line breaks
+    .replace(/\\,/g, ',')         // Convert \, to regular commas  
+    .replace(/\\\\/g, '\\')       // Convert \\ to single backslash
+    .replace(/\\;/g, ';')         // Convert \; to regular semicolons
+    .trim();
 }
 
 /**
