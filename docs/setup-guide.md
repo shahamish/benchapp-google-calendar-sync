@@ -27,10 +27,15 @@
 
 1. Go to [script.google.com](https://script.google.com)
 2. Click "New Project"
-3. Delete the default code
-4. Copy and paste the code from `src/hockey-sync.js`
-5. Update the CONFIG section with your calendar details
-6. Save the project (Ctrl+S)
+3. **Create Configuration File:**
+   - Click the "+" next to Files
+   - Choose "Script" and name it `config`
+   - Copy the contents of `src/config.js` from this repository
+   - Update with your actual calendar details
+4. **Add Main Script:**
+   - In the default `Code.gs` file, delete the default code
+   - Copy and paste the code from `src/hockey-sync.js`
+5. Save the project (Ctrl+S)
 
 ## Step 4: Test and Deploy
 

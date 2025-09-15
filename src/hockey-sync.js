@@ -11,21 +11,12 @@
  */
 
 // ============ CONFIGURATION - UPDATE THESE VALUES ============
-const CONFIG = {
-  // Your family calendar ID (found in Google Calendar settings)
-  FAMILY_CALENDAR_ID: 'your-family-calendar@gmail.com', // Replace with your family calendar ID
-  
-  // Get your BenchApp URL from: BenchApp → Team Calendar → Export/Subscribe
-  // URL format: https://ics.benchapp.com/[encoded-player-and-team-data]
-  HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-encoded-url-here', // Replace with actual URL
-  
-  // Prefix for hockey events (helps identify them later)
-  EVENT_PREFIX: '[Hockey] ',
-  
-  // Days to look ahead for events (prevents syncing very old events)
-  DAYS_LOOKBACK: 7,
-  DAYS_LOOKAHEAD: 180
-};
+/**
+ * Hockey Calendar Sync Script - CLEAN VERSION
+ * Configuration is loaded from config.js
+ */
+
+// Configuration is imported from config.js file
 
 
 // ============ STABLE UID GENERATION ============
@@ -371,22 +362,46 @@ function setupSync() {
  * Sets up automatic triggers
  */
 function setupTriggers() {
-  // Delete existing triggers
+  console.log('Setting up triggers...');
+  
+  // Delete ALL existing triggers for this function
   const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
+  
   triggers.forEach(trigger => {
     if (trigger.getHandlerFunction() === 'syncHockeyCalendar') {
+      console.log(`Deleting existing trigger: ${trigger.getUniqueId()}`);
       ScriptApp.deleteTrigger(trigger);
+      deletedCount++;
     }
   });
   
-  // Create new trigger - runs every 6 hours
-  ScriptApp.newTrigger('syncHockeyCalendar')
-    .timeBased()
-    .everyHours(6)
-    .create();
+  console.log(`Deleted ${deletedCount} existing triggers`);
   
-  console.log('Automatic sync trigger created (runs every 3 hours)');
+  // Create new trigger
+  try {
+    const newTrigger = ScriptApp.newTrigger('syncHockeyCalendar')
+      .timeBased()
+      .everyHours(6)
+      .create();
+    
+    console.log(`✓ Created new trigger: ${newTrigger.getUniqueId()}`);
+    console.log('✓ Trigger will run every 6 hours');
+    
+  } catch (error) {
+    console.error('Failed to create trigger:', error);
+    return;
+  }
+  
+  // Verify creation
+  const allTriggers = ScriptApp.getProjectTriggers();
+  const syncTriggers = allTriggers.filter(t => t.getHandlerFunction() === 'syncHockeyCalendar');
+  console.log(`\nVerification: ${syncTriggers.length} sync trigger(s) now active`);
+  
+  console.log('\nTo verify trigger details:');
+  console.log('Go to Apps Script Editor → Triggers (left sidebar)');
 }
+
 
 /**
  * Gets sync status and last run time
@@ -464,4 +479,28 @@ function debugUpdateDetection() {
       console.log(`Overall result: ${needsUpdateResult ? '❌ UPDATE NEEDED' : '✅ NO UPDATE NEEDED'}`);
     }
   });
+}
+
+function debugTriggers() {
+  console.log('=== TRIGGER DEBUG ===');
+  
+  const triggers = ScriptApp.getProjectTriggers();
+  console.log(`Total triggers found: ${triggers.length}`);
+  
+  triggers.forEach((trigger, index) => {
+    console.log(`\nTrigger ${index + 1}:`);
+    console.log(`  Function: ${trigger.getHandlerFunction()}`);
+    console.log(`  Type: ${trigger.getEventType()}`);
+    console.log(`  UID: ${trigger.getUniqueId()}`);
+    
+    // Note: Google Apps Script doesn't provide a direct way to get the interval
+    // You'll need to check the Triggers page in the Apps Script editor for details
+  });
+  
+  const lastSync = PropertiesService.getScriptProperties().getProperty('lastSyncTime');
+  console.log(`\nLast recorded sync: ${lastSync ? new Date(lastSync) : 'Never'}`);
+  
+  console.log('\nNext steps:');
+  console.log('1. Check Apps Script Editor → Triggers page for frequency details');
+  console.log('2. Check Apps Script Editor → Executions for trigger history');
 }

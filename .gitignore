@@ -30,3 +30,5 @@ npm-debug.log
 .Trashes
 ehthumbs.db
 Thumbs.db
+# Personal configuration with real calendar IDs
+src/config-personal.js

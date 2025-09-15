@@ -32,11 +32,13 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
    - Copy the code from `src/hockey-sync.js`
    - Update the configuration with your calendar details
 
-3. **Configure & Run**
-   ```javascript
+3. **Configure Your Settings**
+   - Copy `src/config.js` to your Google Apps Script as a separate file
+   - Update the configuration with your actual calendar details:
+```javascript
    const CONFIG = {
-     FAMILY_CALENDAR_ID: 'your-calendar@gmail.com',
-     HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-url',
+     FAMILY_CALENDAR_ID: 'your-actual-calendar@gmail.com',
+     HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-actual-url',
      EVENT_PREFIX: '[Hockey] ',
      // ... other settings
    };
@@ -96,6 +98,15 @@ const CONFIG = {
   DAYS_LOOKBACK: 7,         // How far back to sync
   DAYS_LOOKAHEAD: 90,       // How far forward to sync
 };
+
+## 📁 File Structure
+src/
+├── hockey-sync.js    # Main sync logic
+└── config.js         # Configuration template (update with your values)
+
+**For Google Apps Script:**
+- Create two files: `Code.gs` (main script) and `config.gs` (your configuration)
+- Keep your real calendar IDs in the config file only
 ```
 
 ## 🐛 Troubleshooting
