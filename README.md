@@ -106,6 +106,9 @@ const CONFIG = {
 ### Rate Limiting Issues  
 The script includes 300ms delays between calendar operations to prevent Google's rate limits.
 
+### Location Addresses Not Clickable
+**Fixed in v1.2.1:** Location fields now properly unescape ICS formatting characters (\\n, \\,) so addresses display correctly and link to Google Maps.
+
 ## 🤝 Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.
