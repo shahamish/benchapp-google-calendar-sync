@@ -120,6 +120,12 @@ The script includes 300ms delays between calendar operations to prevent Google's
 ### Location Addresses Not Clickable
 **Fixed in v1.2.1:** Location fields now properly unescape ICS formatting characters (\\n, \\,) so addresses display correctly and link to Google Maps.
 
+### Script Deletes All Events When Source is Down
+**Critical Fix in v1.3.1:** Added error handling to prevent data loss when BenchApp servers are unavailable. The script now fails safely rather than deleting events when it cannot fetch data.
+
+**Symptoms:** Script removes all hockey events after a 504 or other HTTP error
+**Solution:** Updated error handling prevents sync when source data is unavailable
+
 ## 🤝 Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.

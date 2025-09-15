@@ -59,3 +59,16 @@
 - Check if there are upcoming events in BenchApp
 - Verify the date range settings (DAYS_LOOKBACK/DAYS_LOOKAHEAD)
 - Look at the execution logs for detailed error messages
+
+## Advanced Troubleshooting
+
+### Server Errors (504, 503, etc.)
+If BenchApp's servers are temporarily down, the script will safely abort the sync rather than delete existing events. Check the execution logs for HTTP error codes.
+
+### Testing Configuration
+Run this function to verify your config is loaded correctly:
+```javascript
+function testConfig() {
+  console.log('FAMILY_CALENDAR_ID:', CONFIG.FAMILY_CALENDAR_ID);
+  console.log('HOCKEY_CALENDAR_URL:', CONFIG.HOCKEY_CALENDAR_URL);
+}
