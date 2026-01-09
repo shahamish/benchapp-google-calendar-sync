@@ -32,3 +32,6 @@ ehthumbs.db
 Thumbs.db
 # Personal configuration with real calendar IDs
 src/config-personal.js
+
+# Clasp configuration (contains script ID)
+.clasp.json

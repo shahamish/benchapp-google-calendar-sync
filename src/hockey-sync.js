@@ -57,18 +57,33 @@ function syncHockeyCalendar() {
     }
     
     console.log(`✓ Fetched ${hockeyEvents.length} hockey events from BenchApp`);
-    
+
     // Additional safety check
     if (hockeyEvents.length === 0) {
       console.warn('⚠️ Zero events fetched - this is unusual. Checking if this is expected...');
       // You might want to add additional logic here to confirm this is intentional
     }
-    
+
+    // CRITICAL FIX: Filter events to only those within our sync window
+    // This prevents duplicates for past events outside the lookback window
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - (CONFIG.DAYS_LOOKBACK * 24 * 60 * 60 * 1000));
+    const windowEnd = new Date(now.getTime() + (CONFIG.DAYS_LOOKAHEAD * 24 * 60 * 60 * 1000));
+
+    const filteredHockeyEvents = hockeyEvents.filter(event =>
+      event.startTime >= windowStart && event.startTime <= windowEnd
+    );
+
+    const filteredOut = hockeyEvents.length - filteredHockeyEvents.length;
+    if (filteredOut > 0) {
+      console.log(`✓ Filtered out ${filteredOut} events outside sync window (${CONFIG.DAYS_LOOKBACK} days back, ${CONFIG.DAYS_LOOKAHEAD} days ahead)`);
+    }
+
     // Rest of your sync logic...
     const existingEvents = getExistingHockeyEvents(familyCalendar);
     console.log(`✓ Found ${existingEvents.length} existing hockey events in family calendar`);
     
-    const results = processEvents(familyCalendar, hockeyEvents, existingEvents);
+    const results = processEvents(familyCalendar, filteredHockeyEvents, existingEvents);
     
     // ... rest unchanged
     
@@ -530,4 +545,270 @@ function testConfig() {
   console.log('FAMILY_CALENDAR_ID:', CONFIG.FAMILY_CALENDAR_ID);
   console.log('HOCKEY_CALENDAR_URL:', CONFIG.HOCKEY_CALENDAR_URL);
   console.log('EVENT_PREFIX:', CONFIG.EVENT_PREFIX);
+}
+
+// ============ DUPLICATE CLEANUP FUNCTIONS ============
+/**
+ * IMPORTANT: Before running cleanup on large numbers of events:
+ *
+ * 1. Disable calendar notifications temporarily:
+ *    - Go to Google Calendar → Settings (gear icon)
+ *    - Click on your calendar under "Settings for my calendars"
+ *    - Scroll to "Event notifications" and "All-day event notifications"
+ *    - Remove or disable notifications temporarily
+ *    - Re-enable after cleanup is complete
+ *
+ * 2. Test on a small date range first using reviewDuplicatesInRange() / cleanupDuplicatesInRange()
+ *
+ * Note: CalendarApp.deleteEvent() does NOT send cancellation emails to attendees,
+ * but your own calendar notification settings may still trigger alerts.
+ */
+
+/**
+ * Creates a signature for grouping duplicate events
+ * Events are considered duplicates if they have the same title and start time
+ */
+function createEventSignature(event) {
+  const title = event.getTitle();
+  const startTime = event.getStartTime().getTime();
+  return `${title}|${startTime}`;
+}
+
+/**
+ * Gets all hockey events within a date range for cleanup purposes
+ */
+function getHockeyEventsInRange(calendar, startDate, endDate) {
+  const events = calendar.getEvents(startDate, endDate);
+  return events.filter(event =>
+    event.getTitle().startsWith(CONFIG.EVENT_PREFIX)
+  );
+}
+
+/**
+ * TEST FUNCTION: Review duplicates for the last N days only
+ * Use this to test on a small subset before running full cleanup
+ * @param {number} daysBack - Number of days to look back (default: 7)
+ */
+function reviewDuplicatesRecent(daysBack = 7) {
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+  return reviewDuplicatesInRange(startDate, endDate);
+}
+
+/**
+ * TEST FUNCTION: Cleanup duplicates for the last N days only
+ * Use this to test cleanup on a small subset first
+ * @param {number} daysBack - Number of days to look back (default: 7)
+ */
+function cleanupDuplicatesRecent(daysBack = 7) {
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - (daysBack * 24 * 60 * 60 * 1000));
+  return cleanupDuplicatesInRange(startDate, endDate);
+}
+
+/**
+ * Reviews duplicate events in a specific date range - DRY RUN
+ * @param {Date} startDate - Start of date range
+ * @param {Date} endDate - End of date range
+ */
+function reviewDuplicatesInRange(startDate, endDate) {
+  console.log('=== DUPLICATE EVENT REVIEW (DRY RUN) ===');
+  console.log('This will NOT delete anything - just report what would be cleaned up.\n');
+
+  const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
+  if (!familyCalendar) {
+    throw new Error('Family calendar not found. Check your FAMILY_CALENDAR_ID.');
+  }
+
+  console.log(`Searching for hockey events from ${startDate.toDateString()} to ${endDate.toDateString()}...`);
+
+  const allEvents = getHockeyEventsInRange(familyCalendar, startDate, endDate);
+  console.log(`Found ${allEvents.length} total hockey events in range.\n`);
+
+  // Group events by signature (title + start time)
+  const eventGroups = new Map();
+
+  allEvents.forEach(event => {
+    const signature = createEventSignature(event);
+    if (!eventGroups.has(signature)) {
+      eventGroups.set(signature, []);
+    }
+    eventGroups.get(signature).push(event);
+  });
+
+  // Find groups with duplicates
+  let totalDuplicates = 0;
+  let affectedEventTypes = 0;
+  const duplicateDetails = [];
+
+  eventGroups.forEach((events, signature) => {
+    if (events.length > 1) {
+      affectedEventTypes++;
+      const duplicateCount = events.length - 1; // Keep one, delete the rest
+      totalDuplicates += duplicateCount;
+
+      const sampleEvent = events[0];
+      duplicateDetails.push({
+        title: sampleEvent.getTitle(),
+        date: sampleEvent.getStartTime().toDateString(),
+        copies: events.length,
+        toDelete: duplicateCount
+      });
+    }
+  });
+
+  // Report results
+  console.log('=== SUMMARY ===');
+  console.log(`Date range: ${startDate.toDateString()} to ${endDate.toDateString()}`);
+  console.log(`Unique event types with duplicates: ${affectedEventTypes}`);
+  console.log(`Total duplicate events to delete: ${totalDuplicates}`);
+  console.log(`Events that will be kept: ${allEvents.length - totalDuplicates}\n`);
+
+  if (duplicateDetails.length > 0) {
+    console.log('=== DUPLICATE DETAILS ===');
+    duplicateDetails.forEach(detail => {
+      console.log(`"${detail.title}" on ${detail.date}: ${detail.copies} copies (will delete ${detail.toDelete})`);
+    });
+  } else {
+    console.log('No duplicates found!');
+  }
+
+  return {
+    totalEvents: allEvents.length,
+    uniqueEventTypes: eventGroups.size,
+    duplicateEventTypes: affectedEventTypes,
+    totalDuplicatesToDelete: totalDuplicates,
+    details: duplicateDetails
+  };
+}
+
+/**
+ * Cleans up duplicate events in a specific date range - DESTRUCTIVE OPERATION
+ * @param {Date} startDate - Start of date range
+ * @param {Date} endDate - End of date range
+ */
+function cleanupDuplicatesInRange(startDate, endDate) {
+  console.log('=== DUPLICATE EVENT CLEANUP ===');
+  console.log('WARNING: This will DELETE duplicate events!\n');
+
+  const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
+  if (!familyCalendar) {
+    throw new Error('Family calendar not found. Check your FAMILY_CALENDAR_ID.');
+  }
+
+  console.log(`Searching for hockey events from ${startDate.toDateString()} to ${endDate.toDateString()}...`);
+
+  const allEvents = getHockeyEventsInRange(familyCalendar, startDate, endDate);
+  console.log(`Found ${allEvents.length} total hockey events in range.\n`);
+
+  // Group events by signature (title + start time)
+  const eventGroups = new Map();
+
+  allEvents.forEach(event => {
+    const signature = createEventSignature(event);
+    if (!eventGroups.has(signature)) {
+      eventGroups.set(signature, []);
+    }
+    eventGroups.get(signature).push(event);
+  });
+
+  // Delete duplicates, keeping the first one
+  let deletedCount = 0;
+  let errorCount = 0;
+
+  eventGroups.forEach((events, signature) => {
+    if (events.length > 1) {
+      const eventsToDelete = events.slice(1);
+
+      console.log(`Processing "${events[0].getTitle()}" on ${events[0].getStartTime().toDateString()}: keeping 1, deleting ${eventsToDelete.length}`);
+
+      eventsToDelete.forEach(event => {
+        try {
+          event.deleteEvent();
+          deletedCount++;
+          Utilities.sleep(100); // Rate limiting to avoid API issues
+        } catch (error) {
+          console.error(`Failed to delete event: ${error}`);
+          errorCount++;
+        }
+      });
+    }
+  });
+
+  console.log('\n=== CLEANUP COMPLETE ===');
+  console.log(`Successfully deleted: ${deletedCount} duplicate events`);
+  if (errorCount > 0) {
+    console.log(`Failed to delete: ${errorCount} events`);
+  }
+  console.log(`Remaining events: ${allEvents.length - deletedCount}`);
+
+  return {
+    deleted: deletedCount,
+    errors: errorCount,
+    remaining: allEvents.length - deletedCount
+  };
+}
+
+/**
+ * Reviews duplicate events without deleting - DRY RUN
+ * Searches from August 1, 2025 to present and reports duplicates
+ */
+function reviewDuplicateEvents() {
+  const startDate = new Date(2025, 7, 1); // August 1, 2025 (month is 0-indexed)
+  const endDate = new Date();
+  return reviewDuplicatesInRange(startDate, endDate);
+}
+
+/**
+ * Cleans up duplicate events - DESTRUCTIVE OPERATION
+ * Keeps one copy of each event and deletes the rest
+ * Run reviewDuplicateEvents() first to see what will be deleted
+ */
+function cleanupDuplicateEvents() {
+  const startDate = new Date(2025, 7, 1); // August 1, 2025
+  const endDate = new Date();
+  return cleanupDuplicatesInRange(startDate, endDate);
+}
+
+// ============ CONVENIENCE WRAPPERS FOR APPS SCRIPT UI ============
+// Use these when running from the Apps Script editor (can't pass parameters via UI)
+
+/** Review duplicates from last 3 days - for quick testing */
+function reviewDuplicates_Last3Days() {
+  return reviewDuplicatesRecent(3);
+}
+
+/** Review duplicates from last 7 days */
+function reviewDuplicates_Last7Days() {
+  return reviewDuplicatesRecent(7);
+}
+
+/** Review duplicates from last 14 days */
+function reviewDuplicates_Last14Days() {
+  return reviewDuplicatesRecent(14);
+}
+
+/** Review duplicates from last 30 days */
+function reviewDuplicates_Last30Days() {
+  return reviewDuplicatesRecent(30);
+}
+
+/** Cleanup duplicates from last 3 days - for testing cleanup */
+function cleanupDuplicates_Last3Days() {
+  return cleanupDuplicatesRecent(3);
+}
+
+/** Cleanup duplicates from last 7 days */
+function cleanupDuplicates_Last7Days() {
+  return cleanupDuplicatesRecent(7);
+}
+
+/** Cleanup duplicates from last 14 days */
+function cleanupDuplicates_Last14Days() {
+  return cleanupDuplicatesRecent(14);
+}
+
+/** Cleanup duplicates from last 30 days */
+function cleanupDuplicates_Last30Days() {
+  return cleanupDuplicatesRecent(30);
 }
