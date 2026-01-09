@@ -1,0 +1,3 @@
+# Ignore config.js to prevent overwriting personal calendar IDs
+# Path is relative to rootDir (./src)
+config.js

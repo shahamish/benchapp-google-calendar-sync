@@ -686,10 +686,12 @@ function reviewDuplicatesInRange(startDate, endDate) {
  * Cleans up duplicate events in a specific date range - DESTRUCTIVE OPERATION
  * @param {Date} startDate - Start of date range
  * @param {Date} endDate - End of date range
+ * @param {number} maxDeletes - Maximum deletions per run to avoid timeout (default: 300)
  */
-function cleanupDuplicatesInRange(startDate, endDate) {
+function cleanupDuplicatesInRange(startDate, endDate, maxDeletes = 300) {
   console.log('=== DUPLICATE EVENT CLEANUP ===');
   console.log('WARNING: This will DELETE duplicate events!\n');
+  console.log(`Batch limit: ${maxDeletes} deletions per run (to avoid 6-minute timeout)\n`);
 
   const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
   if (!familyCalendar) {
@@ -712,40 +714,76 @@ function cleanupDuplicatesInRange(startDate, endDate) {
     eventGroups.get(signature).push(event);
   });
 
+  // Count total duplicates first
+  let totalDuplicates = 0;
+  eventGroups.forEach((events) => {
+    if (events.length > 1) {
+      totalDuplicates += events.length - 1;
+    }
+  });
+  console.log(`Total duplicates to delete: ${totalDuplicates}`);
+  console.log(`Will delete up to ${maxDeletes} this run.\n`);
+
   // Delete duplicates, keeping the first one
   let deletedCount = 0;
   let errorCount = 0;
+  let skippedDueToLimit = 0;
+  let processedGroups = 0;
 
   eventGroups.forEach((events, signature) => {
     if (events.length > 1) {
       const eventsToDelete = events.slice(1);
-
-      console.log(`Processing "${events[0].getTitle()}" on ${events[0].getStartTime().toDateString()}: keeping 1, deleting ${eventsToDelete.length}`);
+      processedGroups++;
 
       eventsToDelete.forEach(event => {
+        // Check if we've hit the batch limit
+        if (deletedCount >= maxDeletes) {
+          skippedDueToLimit++;
+          return;
+        }
+
         try {
           event.deleteEvent();
           deletedCount++;
-          Utilities.sleep(100); // Rate limiting to avoid API issues
+
+          // Progress logging every 50 deletions
+          if (deletedCount % 50 === 0) {
+            console.log(`Progress: ${deletedCount} deleted...`);
+          }
+
+          Utilities.sleep(300); // Rate limiting to match rest of script
         } catch (error) {
           console.error(`Failed to delete event: ${error}`);
           errorCount++;
         }
       });
+
+      // Log each event type being processed (but not every duplicate)
+      if (deletedCount < maxDeletes) {
+        console.log(`Cleaned "${events[0].getTitle()}" on ${events[0].getStartTime().toDateString()}: deleted ${eventsToDelete.length} duplicates`);
+      }
     }
   });
 
-  console.log('\n=== CLEANUP COMPLETE ===');
+  const remainingDuplicates = totalDuplicates - deletedCount;
+
+  console.log('\n=== CLEANUP SUMMARY ===');
   console.log(`Successfully deleted: ${deletedCount} duplicate events`);
   if (errorCount > 0) {
     console.log(`Failed to delete: ${errorCount} events`);
   }
-  console.log(`Remaining events: ${allEvents.length - deletedCount}`);
+  if (remainingDuplicates > 0) {
+    console.log(`\n⚠️ REMAINING DUPLICATES: ${remainingDuplicates}`);
+    console.log('Run this function again to continue cleanup.');
+  } else {
+    console.log('\n✓ All duplicates cleaned up!');
+  }
 
   return {
     deleted: deletedCount,
     errors: errorCount,
-    remaining: allEvents.length - deletedCount
+    remainingDuplicates: remainingDuplicates,
+    needsAnotherRun: remainingDuplicates > 0
   };
 }
 
