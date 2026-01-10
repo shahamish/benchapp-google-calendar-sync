@@ -1,3 +1,5 @@
-# Ignore config.js to prevent overwriting personal calendar IDs
-# Path is relative to rootDir (./src)
-config.js
+# Files to exclude from clasp push
+# Note: config.js is NOT ignored here - it needs to be pushed
+# Keep your local src/config.js with real credentials (it's gitignored)
+**/.git/**
+node_modules/**

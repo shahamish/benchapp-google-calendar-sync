@@ -1,5 +1,6 @@
 # Personal configuration files (contains sensitive calendar IDs)
 config.js
+src/config.js
 personal-config.js
 
 # Logs
