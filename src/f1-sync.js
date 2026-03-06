@@ -137,7 +137,12 @@ function parseF1EventBlock(eventBlock) {
     if (!trimmed) continue;
 
     if (trimmed.startsWith('SUMMARY:')) {
-      event.title = trimmed.substring(8).trim();
+      let title = trimmed.substring(8).trim();
+      // Strip leading "F1: " from feed titles to avoid redundancy with [F1] prefix
+      if (title.startsWith('F1: ')) {
+        title = title.substring(4);
+      }
+      event.title = title;
     } else if (trimmed.startsWith('DTSTART')) {
       event.startTime = parseF1ICSDateTime(trimmed);
     } else if (trimmed.startsWith('DTEND')) {
