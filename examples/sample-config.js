@@ -20,7 +20,15 @@ const CONFIG = {
   F1_CALENDAR_URL: 'https://f1calendar.com/download/f1-calendar_race_sprint.ics',
 
   // Prefix for F1 events in your calendar
-  F1_EVENT_PREFIX: '[F1] '
+  F1_EVENT_PREFIX: '[F1] ',
+
+  // ============ Baseball Settings ============
+  // ICS feed URL for baseball league (from Team Manager)
+  // Note: webcal:// URLs are automatically converted to https:// for fetching
+  BASEBALL_CALENDAR_URL: 'webcal://api.team-manager.gc.com/ics-calendar-documents/user/YOUR-USER-ID.ics?teamId=YOUR-TEAM-ID&token=YOUR-TOKEN',
+
+  // Prefix for baseball events in your calendar
+  BASEBALL_EVENT_PREFIX: '[Baseball] '
 };
 
 // Example BenchApp URLs (yours will be different):

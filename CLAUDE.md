@@ -20,6 +20,8 @@ clasp push --force
 |------|----------------------|------------------|
 | `src/config.js` | Yes | No (gitignored) |
 | `src/hockey-sync.js` | Yes | Yes |
+| `src/f1-sync.js` | Yes | Yes |
+| `src/baseball-sync.js` | Yes | Yes |
 | `src/appsscript.json` | Yes | Yes |
 
 ## If Config Gets Lost
