@@ -7,6 +7,7 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
 - **🔄 Automatic Syncing**: Runs every 6 hours to keep calendars in sync
 - **📅 Full CRUD Support**: Adds new events, updates changes, removes canceled games
 - **🚫 No Duplicates**: Smart tracking prevents duplicate events
+- **👨‍👩‍👧‍👦 Multiple Teams**: Sync several BenchApp teams into one calendar, each with its own prefix
 - **⚙️ Configurable**: Customize event prefixes, sync frequency, and date ranges
 - **🔍 Detailed Logging**: Clear logs for monitoring and troubleshooting
 - **🧪 Test Mode**: Complete test suite for safe deployment
@@ -38,8 +39,10 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
 ```javascript
    const CONFIG = {
      FAMILY_CALENDAR_ID: 'your-actual-calendar@gmail.com',
-     HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-actual-url',
-     EVENT_PREFIX: '[Hockey] ',
+     HOCKEY_TEAMS: [
+       { name: 'Bodhi', calendarUrl: 'https://ics.benchapp.com/first-url',  eventPrefix: '[Hockey - Bodhi] ' },
+       { name: 'Milo',  calendarUrl: 'https://ics.benchapp.com/second-url', eventPrefix: '[Hockey - Milo] ' }
+     ],
      // ... other settings
    };
    ```
@@ -83,7 +86,7 @@ This script solves that by automatically keeping everything in sync!
 
 | BenchApp Event | Google Calendar Result |
 |----------------|------------------------|
-| New game added | ➕ Event created with `[Hockey]` prefix |
+| New game added | ➕ Event created with the team's prefix (e.g. `[Hockey - Bodhi]`) |
 | Time changed | 📝 Existing event updated |
 | Game canceled | 🗑️ Event removed from calendar |
 | Location updated | 📍 Location synced automatically |
@@ -93,21 +96,48 @@ This script solves that by automatically keeping everything in sync!
 ```javascript
 const CONFIG = {
   FAMILY_CALENDAR_ID: '',    // Target Google Calendar
-  HOCKEY_CALENDAR_URL: '',   // BenchApp ICS URL
-  EVENT_PREFIX: '[Hockey] ', // Prefix for hockey events
+  HOCKEY_TEAMS: [            // One entry per BenchApp team
+    {
+      name: 'Bodhi',                         // Label used in logs
+      calendarUrl: '',                       // BenchApp ICS URL
+      eventPrefix: '[Hockey - Bodhi] ',      // Prefix for this team's events (unique per team)
+      legacyPrefixes: ['[Hockey] ']          // Optional: old prefixes to retitle in place
+    },
+    {
+      name: 'Milo',
+      calendarUrl: '',
+      eventPrefix: '[Hockey - Milo] '
+    }
+  ],
   DAYS_LOOKBACK: 7,         // How far back to sync
   DAYS_LOOKAHEAD: 90,       // How far forward to sync
 };
+```
+
+Single-team configs using `HOCKEY_CALENDAR_URL` + `EVENT_PREFIX` still work and are
+treated as one team.
+
+### Renaming a prefix or adding a team
+
+Events are matched to a team by their title prefix. If you rename a team's
+`eventPrefix`, list the old value in that team's `legacyPrefixes` so the next sync
+retitles the existing events in place instead of creating duplicates and leaving the
+old ones behind. Prefixes must not be a prefix of one another (for example
+`[Hockey] ` and `[Hockey] Milo ` would collide and the script refuses to run).
 
 ## 📁 File Structure
+
+```
 src/
-├── hockey-sync.js    # Main sync logic
-└── config.js         # Configuration template (update with your values)
+├── hockey-sync.js    # Hockey sync logic (multi-team)
+├── f1-sync.js        # F1 race calendar sync
+├── baseball-sync.js  # Baseball league sync
+└── config.js         # Your configuration (gitignored; see examples/sample-config.js)
+```
 
 **For Google Apps Script:**
 - Create two files: `Code.gs` (main script) and `config.gs` (your configuration)
 - Keep your real calendar IDs in the config file only
-```
 
 ## 🐛 Troubleshooting
 
@@ -131,7 +161,6 @@ The script includes 300ms delays between calendar operations to prevent Google's
 Contributions welcome! Please feel free to submit a Pull Request.
 
 ### Ideas for Enhancement
-- Support for multiple teams/calendars
 - Slack/Discord notifications for schedule changes
 - Integration with other sports apps
 - Custom event formatting options

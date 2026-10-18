@@ -68,7 +68,6 @@ If BenchApp's servers are temporarily down, the script will safely abort the syn
 ### Testing Configuration
 Run this function to verify your config is loaded correctly:
 ```javascript
-function testConfig() {
-  console.log('FAMILY_CALENDAR_ID:', CONFIG.FAMILY_CALENDAR_ID);
-  console.log('HOCKEY_CALENDAR_URL:', CONFIG.HOCKEY_CALENDAR_URL);
-}
+testConfig();
+// Logs FAMILY_CALENDAR_ID, the sync window, and every entry in HOCKEY_TEAMS
+// (name, calendarUrl, eventPrefix, legacyPrefixes)

@@ -24,6 +24,14 @@ clasp push --force
 | `src/baseball-sync.js` | Yes | Yes |
 | `src/appsscript.json` | Yes | Yes |
 
+## Hockey Config Shape
+
+`src/hockey-sync.js` reads `CONFIG.HOCKEY_TEAMS`, an array of
+`{ name, calendarUrl, eventPrefix, legacyPrefixes }`. Each team syncs independently
+under its own prefix; `legacyPrefixes` lets a prefix rename retitle existing events
+in place. The old single-team keys (`HOCKEY_CALENDAR_URL` + `EVENT_PREFIX`) still
+work as a fallback. See `examples/sample-config.js`.
+
 ## If Config Gets Lost
 
 1. User must restore credentials in Apps Script UI, or

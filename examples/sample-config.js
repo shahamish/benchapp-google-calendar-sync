@@ -4,11 +4,30 @@ const CONFIG = {
   FAMILY_CALENDAR_ID: 'your-family-calendar@group.calendar.google.com',
 
   // ============ Hockey Settings ============
-  // Get this from BenchApp > Team Calendar > Export/Subscribe
-  HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-encoded-url',
+  // One entry per BenchApp team. Get each URL from BenchApp > Team Calendar > Export/Subscribe.
+  //   name:           label used in logs
+  //   calendarUrl:    BenchApp ICS URL for that team
+  //   eventPrefix:    prefix for that team's events in Google Calendar (must be unique per team)
+  //   legacyPrefixes: (optional) older prefixes this team's events were created with.
+  //                   Existing events matching one of these are retitled in place
+  //                   instead of being duplicated when you rename a prefix.
+  HOCKEY_TEAMS: [
+    {
+      name: 'Bodhi',
+      calendarUrl: 'https://ics.benchapp.com/your-first-encoded-url',
+      eventPrefix: '[Hockey - Bodhi] ',
+      legacyPrefixes: ['[Hockey] ']
+    },
+    {
+      name: 'Milo',
+      calendarUrl: 'https://ics.benchapp.com/your-second-encoded-url',
+      eventPrefix: '[Hockey - Milo] '
+    }
+  ],
 
-  // Customize the prefix for hockey events
-  EVENT_PREFIX: '[Hockey] ',
+  // Single-team configs from before HOCKEY_TEAMS existed still work:
+  // HOCKEY_CALENDAR_URL: 'https://ics.benchapp.com/your-encoded-url',
+  // EVENT_PREFIX: '[Hockey] ',
 
   // Date range settings (usually don't need to change)
   DAYS_LOOKBACK: 7,
