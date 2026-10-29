@@ -34,18 +34,22 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
    - Update the configuration with your calendar details
 
 3. **Configure Your Settings**
-   - Copy `src/config.js` to your Google Apps Script as a separate file
-   - Update the configuration with your actual calendar details:
-```javascript
-   const CONFIG = {
-     FAMILY_CALENDAR_ID: 'your-actual-calendar@gmail.com',
-     HOCKEY_TEAMS: [
-       { name: 'Bodhi', calendarUrl: 'https://ics.benchapp.com/first-url',  eventPrefix: '[Hockey - Bodhi] ' },
-       { name: 'Milo',  calendarUrl: 'https://ics.benchapp.com/second-url', eventPrefix: '[Hockey - Milo] ' }
+   - Settings are stored in the script's **Script Properties**, not in a file.
+   - In the Apps Script editor go to Project Settings (gear icon) > Script Properties,
+     and add a property named `CONFIG_JSON`. Its value is your settings as JSON, in the
+     same shape as `examples/sample-config.js`:
+```json
+   {
+     "FAMILY_CALENDAR_ID": "your-actual-calendar@gmail.com",
+     "HOCKEY_TEAMS": [
+       { "name": "Bodhi", "calendarUrl": "https://ics.benchapp.com/first-url",  "eventPrefix": "[Hockey - Bodhi] " },
+       { "name": "Milo",  "calendarUrl": "https://ics.benchapp.com/second-url", "eventPrefix": "[Hockey - Milo] " }
      ],
-     // ... other settings
-   };
+     "DAYS_LOOKBACK": 7,
+     "DAYS_LOOKAHEAD": 90
+   }
    ```
+   - `src/config.js` loads this property. Run `showConfig()` to print what is stored.
 
 4. **Initialize**
    ```javascript
@@ -132,12 +136,12 @@ src/
 ├── hockey-sync.js    # Hockey sync logic (multi-team)
 ├── f1-sync.js        # F1 race calendar sync
 ├── baseball-sync.js  # Baseball league sync
-└── config.js         # Your configuration (gitignored; see examples/sample-config.js)
+└── config.js         # Loads settings from Script Properties (CONFIG_JSON)
 ```
 
 **For Google Apps Script:**
-- Create two files: `Code.gs` (main script) and `config.gs` (your configuration)
-- Keep your real calendar IDs in the config file only
+- Push `src/` with `clasp push --force`, or copy each file into the editor
+- Keep your real calendar IDs in Script Properties only
 
 ## 🐛 Troubleshooting
 

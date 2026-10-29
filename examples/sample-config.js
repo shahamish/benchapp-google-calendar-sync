@@ -1,4 +1,6 @@
-// Sample configuration - copy and update with your details
+// Sample configuration - shows the shape of the settings.
+// The live settings are stored as JSON in the Apps Script project's Script Properties
+// under CONFIG_JSON (Project Settings > Script Properties). src/config.js loads them.
 const CONFIG = {
   // Find this in Google Calendar Settings > Your Calendar > Calendar ID
   FAMILY_CALENDAR_ID: 'your-family-calendar@group.calendar.google.com',
