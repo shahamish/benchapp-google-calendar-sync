@@ -220,7 +220,7 @@ benchapp-google-calendar-sync/
 ├── .clasp.json.example    # Template (copy to .clasp.json)
 ├── .clasp.json            # Your config (gitignored)
 ├── src/
-│   ├── config.js          # Loads settings from Script Properties (CONFIG_JSON)
+│   ├── config.js          # Not in git: live config.gs, pulled by scripts/deploy.sh
 │   └── hockey-sync.js     # Main script
 └── docs/
     └── deployment-guide.md

@@ -28,9 +28,8 @@
 1. Go to [script.google.com](https://script.google.com)
 2. Click "New Project"
 3. **Add Your Settings:**
-   - Click the "+" next to Files, choose "Script", name it `config`, and paste in `src/config.js`
-   - Go to Project Settings (gear icon) > Script Properties > Add script property
-   - Name it `CONFIG_JSON` and paste your settings as JSON (same shape as `examples/sample-config.js`)
+   - Click the "+" next to Files, choose "Script", and name it `config`
+   - Paste in `examples/sample-config.js` and fill in your real calendar details
 4. **Add Main Script:**
    - In the default `Code.gs` file, delete the default code
    - Copy and paste the code from `src/hockey-sync.js`
