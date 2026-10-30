@@ -15,15 +15,15 @@ const CONFIG = {
   //                   instead of being duplicated when you rename a prefix.
   HOCKEY_TEAMS: [
     {
-      name: 'Bodhi',
+      name: 'Red',
       calendarUrl: 'https://ics.benchapp.com/your-first-encoded-url',
-      eventPrefix: '[Hockey - Bodhi] ',
+      eventPrefix: '[Hockey - Red] ',
       legacyPrefixes: ['[Hockey] ']
     },
     {
-      name: 'Milo',
+      name: 'Blue',
       calendarUrl: 'https://ics.benchapp.com/your-second-encoded-url',
-      eventPrefix: '[Hockey - Milo] '
+      eventPrefix: '[Hockey - Blue] '
     }
   ],
 
@@ -52,6 +52,5 @@ const CONFIG = {
   BASEBALL_EVENT_PREFIX: '[Baseball] '
 };
 
-// Example BenchApp URLs (yours will be different):
-// https://ics.benchapp.com/eyJwbGF5ZXJJZCI6MTE0NzY4NjMsInRlYW1JZCI6WzEyODY5ODBdfQ==
+// Example BenchApp URL format (yours will be different):
 // https://ics.benchapp.com/eyJwbGF5ZXJJZCI6OTg3NjU0MzIsInRlYW1JZCI6WzU0MzIxMDBdfQ==
