@@ -1,17 +1,92 @@
 /**
- * Hockey Calendar Sync Script - COMPLETE FIXED VERSION
- * Automatically syncs events from BenchApp calendar to Google Calendar
- * FIXES: Duplicate event creation issue with stable UIDs
- */
-
-// ============ CONFIGURATION - UPDATE THESE VALUES ============
-/**
- * Hockey Calendar Sync Script - CLEAN VERSION
- * Configuration is loaded from config.js
+ * Hockey Calendar Sync Script
+ * Automatically syncs events from one or more BenchApp calendars to Google Calendar
+ * - Stable, content-based UIDs prevent duplicate events
+ * - Supports multiple teams, each with its own BenchApp feed and event prefix
  */
 
 // Configuration is imported from config.js file (config.gs in Google Apps Script)
+// Required config keys: FAMILY_CALENDAR_ID, DAYS_LOOKBACK, DAYS_LOOKAHEAD, and either
+//   HOCKEY_TEAMS: [{ name, calendarUrl, eventPrefix, legacyPrefixes }, ...]
+// or the original single-team keys HOCKEY_CALENDAR_URL + EVENT_PREFIX.
 
+// ============ TEAM CONFIGURATION ============
+/**
+ * Resolves the list of hockey teams to sync from CONFIG.
+ * Falls back to the original single-team keys so older configs keep working.
+ *
+ * Each team: {
+ *   name:           label used in logs
+ *   calendarUrl:    BenchApp ICS URL
+ *   eventPrefix:    prefix applied to event titles in Google Calendar
+ *   legacyPrefixes: older prefixes this team's events may still carry; matching
+ *                   events are claimed and retitled in place instead of duplicated
+ * }
+ */
+function getHockeyTeams() {
+  let teams;
+
+  if (Array.isArray(CONFIG.HOCKEY_TEAMS) && CONFIG.HOCKEY_TEAMS.length > 0) {
+    teams = CONFIG.HOCKEY_TEAMS.map((team, index) => {
+      if (!team || !team.calendarUrl) {
+        throw new Error(`HOCKEY_TEAMS[${index}] is missing calendarUrl`);
+      }
+      if (!team.eventPrefix) {
+        throw new Error(`HOCKEY_TEAMS[${index}] is missing eventPrefix`);
+      }
+      return {
+        name: team.name || `Team ${index + 1}`,
+        calendarUrl: team.calendarUrl,
+        eventPrefix: team.eventPrefix,
+        legacyPrefixes: Array.isArray(team.legacyPrefixes) ? team.legacyPrefixes : []
+      };
+    });
+  } else if (CONFIG.HOCKEY_CALENDAR_URL && CONFIG.EVENT_PREFIX) {
+    teams = [{
+      name: 'Hockey',
+      calendarUrl: CONFIG.HOCKEY_CALENDAR_URL,
+      eventPrefix: CONFIG.EVENT_PREFIX,
+      legacyPrefixes: []
+    }];
+  } else {
+    throw new Error('No hockey teams configured. Set CONFIG.HOCKEY_TEAMS (or HOCKEY_CALENDAR_URL + EVENT_PREFIX).');
+  }
+
+  // Guard against one team's prefix matching another team's events
+  teams.forEach(a => {
+    teams.forEach(b => {
+      if (a === b) return;
+      getTeamPrefixes(a).forEach(prefixA => {
+        if (b.eventPrefix.startsWith(prefixA)) {
+          throw new Error(`Prefix "${prefixA}" (${a.name}) would also match "${b.eventPrefix}" (${b.name}) events. Prefixes must be distinct.`);
+        }
+      });
+    });
+  });
+
+  return teams;
+}
+
+/**
+ * All prefixes (current + legacy) that identify a team's events in the calendar
+ */
+function getTeamPrefixes(team) {
+  return [team.eventPrefix].concat(team.legacyPrefixes || []);
+}
+
+/**
+ * True if a calendar event title belongs to the given team
+ */
+function titleMatchesTeam(title, team) {
+  return getTeamPrefixes(team).some(prefix => title.startsWith(prefix));
+}
+
+/**
+ * True if a calendar event title belongs to any configured hockey team
+ */
+function titleMatchesAnyTeam(title, teams) {
+  return teams.some(team => titleMatchesTeam(title, team));
+}
 
 // ============ STABLE UID GENERATION ============
 /**
@@ -37,73 +112,103 @@ function createStableUID(event) {
 
 // ============ MAIN SYNC FUNCTION ============
 /**
- * Main synchronization function
+ * Main synchronization function - syncs every configured hockey team.
+ * Keep this name: the time-based trigger created by setupTriggers() calls it.
  */
 function syncHockeyCalendar() {
-  try {
-    console.log(`=== Hockey Calendar Sync Started at ${new Date().toISOString()} ===`);
-    
-    const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
-    if (!familyCalendar) {
-      throw new Error('Family calendar not found. Check your FAMILY_CALENDAR_ID.');
-    }
-    
-    const hockeyEvents = fetchHockeyEvents();
-    
-    // CRITICAL: Don't proceed if fetch failed
-    if (hockeyEvents === null) {
-      console.error('❌ Cannot fetch BenchApp data - aborting sync to prevent data loss');
-      throw new Error('BenchApp fetch failed - sync aborted for safety');
-    }
-    
-    console.log(`✓ Fetched ${hockeyEvents.length} hockey events from BenchApp`);
+  console.log(`=== Hockey Calendar Sync Started at ${new Date().toISOString()} ===`);
 
-    // Additional safety check
-    if (hockeyEvents.length === 0) {
-      console.warn('⚠️ Zero events fetched - this is unusual. Checking if this is expected...');
-      // You might want to add additional logic here to confirm this is intentional
-    }
-
-    // CRITICAL FIX: Filter events to only those within our sync window
-    // This prevents duplicates for past events outside the lookback window
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - (CONFIG.DAYS_LOOKBACK * 24 * 60 * 60 * 1000));
-    const windowEnd = new Date(now.getTime() + (CONFIG.DAYS_LOOKAHEAD * 24 * 60 * 60 * 1000));
-
-    const filteredHockeyEvents = hockeyEvents.filter(event =>
-      event.startTime >= windowStart && event.startTime <= windowEnd
-    );
-
-    const filteredOut = hockeyEvents.length - filteredHockeyEvents.length;
-    if (filteredOut > 0) {
-      console.log(`✓ Filtered out ${filteredOut} events outside sync window (${CONFIG.DAYS_LOOKBACK} days back, ${CONFIG.DAYS_LOOKAHEAD} days ahead)`);
-    }
-
-    // Rest of your sync logic...
-    const existingEvents = getExistingHockeyEvents(familyCalendar);
-    console.log(`✓ Found ${existingEvents.length} existing hockey events in family calendar`);
-    
-    const results = processEvents(familyCalendar, filteredHockeyEvents, existingEvents);
-    
-    // ... rest unchanged
-    
-  } catch (error) {
-    console.error('❌ Sync failed:', error);
-    throw error;
+  const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
+  if (!familyCalendar) {
+    throw new Error('Family calendar not found. Check your FAMILY_CALENDAR_ID.');
   }
+
+  const teams = getHockeyTeams();
+  console.log(`Syncing ${teams.length} hockey team(s): ${teams.map(t => t.name).join(', ')}`);
+
+  const totals = { added: 0, updated: 0, removed: 0, unchanged: 0 };
+  const failedTeams = [];
+
+  // Each team is synced independently so one unreachable feed doesn't block the others
+  teams.forEach(team => {
+    try {
+      const results = syncHockeyTeam(familyCalendar, team);
+      totals.added += results.added;
+      totals.updated += results.updated;
+      totals.removed += results.removed;
+      totals.unchanged += results.unchanged;
+    } catch (error) {
+      console.error(`❌ [${team.name}] Sync failed:`, error);
+      failedTeams.push(team.name);
+    }
+  });
+
+  console.log(`=== Hockey Sync Complete: ${totals.added} added, ${totals.updated} updated, ${totals.removed} removed, ${totals.unchanged} unchanged ===`);
+  PropertiesService.getScriptProperties().setProperty('lastSyncTime', new Date().toISOString());
+
+  if (failedTeams.length > 0) {
+    throw new Error(`Hockey sync failed for: ${failedTeams.join(', ')}`);
+  }
+
+  return totals;
+}
+
+/**
+ * Syncs a single team's BenchApp feed into the family calendar
+ */
+function syncHockeyTeam(familyCalendar, team) {
+  console.log(`--- [${team.name}] Sync started (prefix "${team.eventPrefix}") ---`);
+
+  const hockeyEvents = fetchHockeyEvents(team);
+
+  // CRITICAL: Don't proceed if fetch failed
+  if (hockeyEvents === null) {
+    console.error(`❌ [${team.name}] Cannot fetch BenchApp data - aborting sync to prevent data loss`);
+    throw new Error(`[${team.name}] BenchApp fetch failed - sync aborted for safety`);
+  }
+
+  console.log(`✓ [${team.name}] Fetched ${hockeyEvents.length} hockey events from BenchApp`);
+
+  // Additional safety check
+  if (hockeyEvents.length === 0) {
+    console.warn(`⚠️ [${team.name}] Zero events fetched - this is unusual. Checking if this is expected...`);
+  }
+
+  // Filter events to only those within our sync window
+  // This prevents duplicates for past events outside the lookback window
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - (CONFIG.DAYS_LOOKBACK * 24 * 60 * 60 * 1000));
+  const windowEnd = new Date(now.getTime() + (CONFIG.DAYS_LOOKAHEAD * 24 * 60 * 60 * 1000));
+
+  const filteredHockeyEvents = hockeyEvents.filter(event =>
+    event.startTime >= windowStart && event.startTime <= windowEnd
+  );
+
+  const filteredOut = hockeyEvents.length - filteredHockeyEvents.length;
+  if (filteredOut > 0) {
+    console.log(`✓ [${team.name}] Filtered out ${filteredOut} events outside sync window (${CONFIG.DAYS_LOOKBACK} days back, ${CONFIG.DAYS_LOOKAHEAD} days ahead)`);
+  }
+
+  const existingEvents = getExistingHockeyEvents(familyCalendar, team);
+  console.log(`✓ [${team.name}] Found ${existingEvents.length} existing hockey events in family calendar`);
+
+  const results = processEvents(familyCalendar, filteredHockeyEvents, existingEvents, team);
+  console.log(`--- [${team.name}] Sync complete: ${results.added} added, ${results.updated} updated, ${results.removed} removed, ${results.unchanged} unchanged ---`);
+
+  return results;
 }
 
 // ============ FETCH HOCKEY EVENTS ============
 /**
- * Fetches and parses events from the hockey calendar URL
+ * Fetches and parses events from a team's BenchApp calendar URL
  */
-function fetchHockeyEvents() {
+function fetchHockeyEvents(team) {
   try {
-    const response = UrlFetchApp.fetch(CONFIG.HOCKEY_CALENDAR_URL);
+    const response = UrlFetchApp.fetch(team.calendarUrl);
     
     // Check if we got a valid response
     if (response.getResponseCode() !== 200) {
-      console.error(`BenchApp returned error code: ${response.getResponseCode()}`);
+      console.error(`[${team.name}] BenchApp returned error code: ${response.getResponseCode()}`);
       console.error('Response:', response.getContentText());
       throw new Error(`BenchApp server error: ${response.getResponseCode()}`);
     }
@@ -112,7 +217,7 @@ function fetchHockeyEvents() {
     
     // Check if we got actual ICS data
     if (!icsData || !icsData.includes('BEGIN:VCALENDAR')) {
-      console.error('Invalid ICS data received from BenchApp');
+      console.error(`[${team.name}] Invalid ICS data received from BenchApp`);
       throw new Error('Invalid calendar data from BenchApp');
     }
     
@@ -120,14 +225,14 @@ function fetchHockeyEvents() {
     
     // Sanity check - if we normally have events but get 0, something's wrong
     if (events.length === 0) {
-      console.warn('⚠️ WARNING: Fetched 0 events from BenchApp - this might indicate a server issue');
+      console.warn(`⚠️ [${team.name}] WARNING: Fetched 0 events from BenchApp - this might indicate a server issue`);
       console.warn('Previous syncs typically found events. Proceeding cautiously...');
     }
     
     return events;
     
   } catch (error) {
-    console.error('Failed to fetch hockey calendar:', error);
+    console.error(`[${team.name}] Failed to fetch hockey calendar:`, error);
     
     // CRITICAL: Return null to indicate failure, not empty array
     return null;
@@ -220,16 +325,18 @@ function parseICSDateTime(line) {
 
 // ============ CALENDAR MANAGEMENT ============
 /**
- * Gets existing hockey events from the family calendar
+ * Gets a team's existing hockey events from the family calendar.
+ * Matches the team's current prefix and any legacy prefixes so a prefix
+ * rename retitles events in place instead of recreating them.
  */
-function getExistingHockeyEvents(calendar) {
+function getExistingHockeyEvents(calendar, team) {
   const now = new Date();
   const startDate = new Date(now.getTime() - (CONFIG.DAYS_LOOKBACK * 24 * 60 * 60 * 1000));
   const endDate = new Date(now.getTime() + (CONFIG.DAYS_LOOKAHEAD * 24 * 60 * 60 * 1000));
   
   const events = calendar.getEvents(startDate, endDate);
   return events.filter(event => 
-    event.getTitle().startsWith(CONFIG.EVENT_PREFIX) &&
+    titleMatchesTeam(event.getTitle(), team) &&
     event.getDescription() && 
     event.getDescription().includes('Hockey-UID:')
   );
@@ -238,7 +345,7 @@ function getExistingHockeyEvents(calendar) {
 /**
  * Process events - simplified version without complex batching
  */
-function processEvents(familyCalendar, hockeyEvents, existingEvents) {
+function processEvents(familyCalendar, hockeyEvents, existingEvents, team) {
   const results = { added: 0, updated: 0, removed: 0, unchanged: 0 };
   
   // Create lookup maps
@@ -253,22 +360,22 @@ function processEvents(familyCalendar, hockeyEvents, existingEvents) {
     }
   });
   
-  console.log(`Matching ${hockeyEventMap.size} BenchApp events against ${existingEventMap.size} existing events`);
+  console.log(`[${team.name}] Matching ${hockeyEventMap.size} BenchApp events against ${existingEventMap.size} existing events`);
   
   // Process hockey events (add or update)
   hockeyEvents.forEach(hockeyEvent => {
     const existingEvent = existingEventMap.get(hockeyEvent.uid);
     
     if (existingEvent) {
-      if (needsUpdate(existingEvent, hockeyEvent)) {
-        updateEvent(existingEvent, hockeyEvent);
+      if (needsUpdate(existingEvent, hockeyEvent, team)) {
+        updateEvent(existingEvent, hockeyEvent, team);
         results.updated++;
         Utilities.sleep(300); // Rate limiting
       } else {
         results.unchanged++;
       }
     } else {
-      createEvent(familyCalendar, hockeyEvent);
+      createEvent(familyCalendar, hockeyEvent, team);
       results.added++;
       Utilities.sleep(300); // Rate limiting
     }
@@ -278,7 +385,7 @@ function processEvents(familyCalendar, hockeyEvents, existingEvents) {
   existingEvents.forEach(existingEvent => {
     const uid = extractUIDFromDescription(existingEvent.getDescription());
     if (uid && !hockeyEventMap.has(uid)) {
-      console.log(`Removing: "${existingEvent.getTitle()}" (UID: ${uid})`);
+      console.log(`[${team.name}] Removing: "${existingEvent.getTitle()}" (UID: ${uid})`);
       existingEvent.deleteEvent();
       results.removed++;
       Utilities.sleep(300); // Rate limiting
@@ -291,8 +398,8 @@ function processEvents(familyCalendar, hockeyEvents, existingEvents) {
 /**
  * Creates a new event in the family calendar
  */
-function createEvent(calendar, hockeyEvent) {
-  const title = CONFIG.EVENT_PREFIX + hockeyEvent.title;
+function createEvent(calendar, hockeyEvent, team) {
+  const title = team.eventPrefix + hockeyEvent.title;
   const endTime = hockeyEvent.endTime || new Date(hockeyEvent.startTime.getTime() + 2 * 60 * 60 * 1000);
   const description = (hockeyEvent.description || '').trim() + 
     (hockeyEvent.description ? '\n\n' : '') + 
@@ -308,14 +415,14 @@ function createEvent(calendar, hockeyEvent) {
     }
   );
   
-  console.log(`Created: "${title}" with UID: ${hockeyEvent.uid}`);
+  console.log(`[${team.name}] Created: "${title}" with UID: ${hockeyEvent.uid}`);
 }
 
 /**
  * Updates an existing event
  */
-function updateEvent(existingEvent, hockeyEvent) {
-  const newTitle = CONFIG.EVENT_PREFIX + hockeyEvent.title;
+function updateEvent(existingEvent, hockeyEvent, team) {
+  const newTitle = team.eventPrefix + hockeyEvent.title;
   const newEndTime = hockeyEvent.endTime || new Date(hockeyEvent.startTime.getTime() + 2 * 60 * 60 * 1000);
   const newDescription = (hockeyEvent.description || '').trim() + 
     (hockeyEvent.description ? '\n\n' : '') + 
@@ -326,14 +433,14 @@ function updateEvent(existingEvent, hockeyEvent) {
   existingEvent.setDescription(newDescription);
   existingEvent.setLocation(hockeyEvent.location || '');
   
-  console.log(`Updated: "${newTitle}"`);
+  console.log(`[${team.name}] Updated: "${newTitle}"`);
 }
 
 /**
  * Checks if an event needs updating - with detailed logging
  */
-function needsUpdate(existingEvent, hockeyEvent) {
-  const expectedTitle = CONFIG.EVENT_PREFIX + hockeyEvent.title;
+function needsUpdate(existingEvent, hockeyEvent, team) {
+  const expectedTitle = team.eventPrefix + hockeyEvent.title;
   const expectedEndTime = hockeyEvent.endTime || new Date(hockeyEvent.startTime.getTime() + 2 * 60 * 60 * 1000);
   
   const titleChanged = existingEvent.getTitle() !== expectedTitle;
@@ -381,12 +488,15 @@ function setupSync() {
     throw new Error('Cannot access family calendar. Please check the calendar ID and permissions.');
   }
   
-  try {
-    UrlFetchApp.fetch(CONFIG.HOCKEY_CALENDAR_URL);
-    console.log('Hockey calendar URL is accessible');
-  } catch (error) {
-    throw new Error('Cannot access hockey calendar URL: ' + error.toString());
-  }
+  const teams = getHockeyTeams();
+  teams.forEach(team => {
+    try {
+      UrlFetchApp.fetch(team.calendarUrl);
+      console.log(`[${team.name}] Hockey calendar URL is accessible`);
+    } catch (error) {
+      throw new Error(`[${team.name}] Cannot access hockey calendar URL: ` + error.toString());
+    }
+  });
   
   syncHockeyCalendar();
   
@@ -460,14 +570,24 @@ function getSyncStatus() {
  * Quick status check
  */
 function quickStatusCheck() {
-  const benchAppCount = fetchHockeyEvents().length;
-  const calendarCount = getExistingHockeyEvents(CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID)).length;
-  
-  console.log(`BenchApp events: ${benchAppCount}`);
-  console.log(`Family calendar hockey events: ${calendarCount}`);
-  console.log(`Match: ${benchAppCount === calendarCount ? '✅ YES' : '❌ NO'}`);
-  
-  return { benchApp: benchAppCount, calendar: calendarCount };
+  const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
+  const status = {};
+
+  getHockeyTeams().forEach(team => {
+    const fetched = fetchHockeyEvents(team);
+    const benchAppCount = fetched ? fetched.length : null;
+    const calendarCount = getExistingHockeyEvents(familyCalendar, team).length;
+
+    console.log(`\n--- [${team.name}] ---`);
+    console.log(`BenchApp events: ${benchAppCount === null ? 'FETCH FAILED' : benchAppCount}`);
+    console.log(`Family calendar hockey events: ${calendarCount}`);
+    console.log(`Match: ${benchAppCount === calendarCount ? '✅ YES' : '❌ NO'}`);
+    console.log('(Note: BenchApp count is the full feed; calendar count is limited to the sync window)');
+
+    status[team.name] = { benchApp: benchAppCount, calendar: calendarCount };
+  });
+
+  return status;
 }
 
 /**
@@ -477,26 +597,34 @@ function debugUpdateDetection() {
   console.log('=== DEBUG UPDATE DETECTION ===');
   
   const familyCalendar = CalendarApp.getCalendarById(CONFIG.FAMILY_CALENDAR_ID);
-  const hockeyEvents = fetchHockeyEvents().slice(0, 3); // Just check first 3
-  const existingEvents = getExistingHockeyEvents(familyCalendar);
-  
-  // Create lookup map
-  const existingEventMap = new Map();
-  existingEvents.forEach(event => {
-    const uid = extractUIDFromDescription(event.getDescription());
-    if (uid) {
-      existingEventMap.set(uid, event);
+
+  getHockeyTeams().forEach(team => {
+    console.log(`\n===== [${team.name}] =====`);
+    const fetched = fetchHockeyEvents(team);
+    if (!fetched) {
+      console.log('Fetch failed - skipping');
+      return;
     }
-  });
-  
-  hockeyEvents.forEach((hockeyEvent, index) => {
+    const hockeyEvents = fetched.slice(0, 3); // Just check first 3
+    const existingEvents = getExistingHockeyEvents(familyCalendar, team);
+
+    // Create lookup map
+    const existingEventMap = new Map();
+    existingEvents.forEach(event => {
+      const uid = extractUIDFromDescription(event.getDescription());
+      if (uid) {
+        existingEventMap.set(uid, event);
+      }
+    });
+
+    hockeyEvents.forEach((hockeyEvent, index) => {
     const existingEvent = existingEventMap.get(hockeyEvent.uid);
     
     if (existingEvent) {
       console.log(`\n--- Event ${index + 1}: "${hockeyEvent.title}" ---`);
       console.log(`UID: ${hockeyEvent.uid}`);
       
-      const expectedTitle = CONFIG.EVENT_PREFIX + hockeyEvent.title;
+      const expectedTitle = team.eventPrefix + hockeyEvent.title;
       const expectedEndTime = hockeyEvent.endTime || new Date(hockeyEvent.startTime.getTime() + 2 * 60 * 60 * 1000);
       
       console.log(`Title: "${existingEvent.getTitle()}" vs "${expectedTitle}" - ${existingEvent.getTitle() === expectedTitle ? '✅' : '❌'}`);
@@ -510,9 +638,10 @@ function debugUpdateDetection() {
       const locationMatch = (existingEvent.getLocation() || '').toLowerCase().trim() === (hockeyEvent.location || '').toLowerCase().trim();
       console.log(`Location: "${existingEvent.getLocation() || ''}" vs "${hockeyEvent.location || ''}" - ${locationMatch ? '✅' : '❌'}`);
       
-      const needsUpdateResult = needsUpdate(existingEvent, hockeyEvent);
+      const needsUpdateResult = needsUpdate(existingEvent, hockeyEvent, team);
       console.log(`Overall result: ${needsUpdateResult ? '❌ UPDATE NEEDED' : '✅ NO UPDATE NEEDED'}`);
     }
+    });
   });
 }
 
@@ -543,8 +672,17 @@ function debugTriggers() {
 function testConfig() {
   console.log('Testing configuration access...');
   console.log('FAMILY_CALENDAR_ID:', CONFIG.FAMILY_CALENDAR_ID);
-  console.log('HOCKEY_CALENDAR_URL:', CONFIG.HOCKEY_CALENDAR_URL);
-  console.log('EVENT_PREFIX:', CONFIG.EVENT_PREFIX);
+  console.log('DAYS_LOOKBACK:', CONFIG.DAYS_LOOKBACK);
+  console.log('DAYS_LOOKAHEAD:', CONFIG.DAYS_LOOKAHEAD);
+
+  const teams = getHockeyTeams();
+  console.log(`Hockey teams configured: ${teams.length}`);
+  teams.forEach(team => {
+    console.log(`  [${team.name}]`);
+    console.log(`    calendarUrl:    ${team.calendarUrl}`);
+    console.log(`    eventPrefix:    "${team.eventPrefix}"`);
+    console.log(`    legacyPrefixes: ${JSON.stringify(team.legacyPrefixes)}`);
+  });
 }
 
 // ============ DUPLICATE CLEANUP FUNCTIONS ============
@@ -575,12 +713,14 @@ function createEventSignature(event) {
 }
 
 /**
- * Gets all hockey events within a date range for cleanup purposes
+ * Gets all hockey events (any configured team, current or legacy prefix)
+ * within a date range for cleanup purposes
  */
 function getHockeyEventsInRange(calendar, startDate, endDate) {
+  const teams = getHockeyTeams();
   const events = calendar.getEvents(startDate, endDate);
   return events.filter(event =>
-    event.getTitle().startsWith(CONFIG.EVENT_PREFIX)
+    titleMatchesAnyTeam(event.getTitle(), teams)
   );
 }
 

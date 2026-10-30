@@ -1,6 +1,5 @@
 # Personal configuration files (contains sensitive calendar IDs)
-config.js
-src/config.js
+# Note: src/config.js is committed. It only loads settings from Script Properties.
 personal-config.js
 
 # Logs
@@ -34,5 +33,6 @@ Thumbs.db
 # Personal configuration with real calendar IDs
 src/config-personal.js
 
-# Clasp configuration (contains script ID)
+# Clasp configuration (contains script ID; written by .claude/hooks/session-start.sh in cloud sessions)
 .clasp.json
+.clasprc.json

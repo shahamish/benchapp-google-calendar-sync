@@ -27,11 +27,10 @@
 
 1. Go to [script.google.com](https://script.google.com)
 2. Click "New Project"
-3. **Create Configuration File:**
-   - Click the "+" next to Files
-   - Choose "Script" and name it `config`
-   - Copy the contents of `src/config.js` from this repository
-   - Update with your actual calendar details
+3. **Add Your Settings:**
+   - Click the "+" next to Files, choose "Script", name it `config`, and paste in `src/config.js`
+   - Go to Project Settings (gear icon) > Script Properties > Add script property
+   - Name it `CONFIG_JSON` and paste your settings as JSON (same shape as `examples/sample-config.js`)
 4. **Add Main Script:**
    - In the default `Code.gs` file, delete the default code
    - Copy and paste the code from `src/hockey-sync.js`
@@ -68,7 +67,6 @@ If BenchApp's servers are temporarily down, the script will safely abort the syn
 ### Testing Configuration
 Run this function to verify your config is loaded correctly:
 ```javascript
-function testConfig() {
-  console.log('FAMILY_CALENDAR_ID:', CONFIG.FAMILY_CALENDAR_ID);
-  console.log('HOCKEY_CALENDAR_URL:', CONFIG.HOCKEY_CALENDAR_URL);
-}
+testConfig();
+// Logs FAMILY_CALENDAR_ID, the sync window, and every entry in HOCKEY_TEAMS
+// (name, calendarUrl, eventPrefix, legacyPrefixes)
