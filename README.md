@@ -34,22 +34,20 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
    - Update the configuration with your calendar details
 
 3. **Configure Your Settings**
-   - Settings are stored in the script's **Script Properties**, not in a file.
-   - In the Apps Script editor go to Project Settings (gear icon) > Script Properties,
-     and add a property named `CONFIG_JSON`. Its value is your settings as JSON, in the
-     same shape as `examples/sample-config.js`:
-```json
-   {
-     "FAMILY_CALENDAR_ID": "your-actual-calendar@gmail.com",
-     "HOCKEY_TEAMS": [
-       { "name": "Red", "calendarUrl": "https://ics.benchapp.com/first-url",  "eventPrefix": "[Hockey - Red] " },
-       { "name": "Blue",  "calendarUrl": "https://ics.benchapp.com/second-url", "eventPrefix": "[Hockey - Blue] " }
+   - In the Apps Script editor, create a file named `config` and paste in
+     `examples/sample-config.js`, then fill in your real values:
+```javascript
+   const CONFIG = {
+     FAMILY_CALENDAR_ID: 'your-actual-calendar@gmail.com',
+     HOCKEY_TEAMS: [
+       { name: 'Red',  calendarUrl: 'https://ics.benchapp.com/first-url',  eventPrefix: '[Hockey - Red] ' },
+       { name: 'Blue', calendarUrl: 'https://ics.benchapp.com/second-url', eventPrefix: '[Hockey - Blue] ' }
      ],
-     "DAYS_LOOKBACK": 7,
-     "DAYS_LOOKAHEAD": 90
-   }
+     // ... other settings
+   };
    ```
-   - `src/config.js` loads this property. Run `showConfig()` to print what is stored.
+   - This file lives only in Apps Script. Deploy code with `scripts/deploy.sh`,
+     which keeps it intact (see File Structure below).
 
 4. **Initialize**
    ```javascript
@@ -136,12 +134,13 @@ src/
 ├── hockey-sync.js    # Hockey sync logic (multi-team)
 ├── f1-sync.js        # F1 race calendar sync
 ├── baseball-sync.js  # Baseball league sync
-└── config.js         # Loads settings from Script Properties (CONFIG_JSON)
+└── config.js         # Not in git: the live config.gs, pulled in by scripts/deploy.sh
 ```
 
 **For Google Apps Script:**
-- Push `src/` with `clasp push --force`, or copy each file into the editor
-- Keep your real calendar IDs in Script Properties only
+- Deploy with `scripts/deploy.sh`. It pulls the live `config.gs` from Apps Script and
+  then pushes `src/`, so your settings are never overwritten or deleted.
+- Keep your real calendar IDs in `config.gs` in Apps Script only
 
 ## 🐛 Troubleshooting
 

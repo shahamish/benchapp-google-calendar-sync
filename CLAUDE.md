@@ -2,18 +2,24 @@
 
 ## Clasp Deployment Workflow
 
+**Always deploy with the script, never with a bare `clasp push`:**
+
 ```bash
-clasp show-file-status   # preview which files will be pushed
-clasp push --force
+scripts/deploy.sh --dry-run   # preview: what changes, what would be deleted
+scripts/deploy.sh             # pull live config.gs, then push src/
 ```
 
 **Important:**
-- Live settings are stored in the Apps Script project's **Script Properties** under
-  `CONFIG_JSON`, not in any file. `src/config.js` is committed and only loads them.
-- `clasp push --force` replaces every file in the Apps Script project with `src/`.
-  Never push from a folder that has an old-style `src/config.js` with a hardcoded
-  `const CONFIG = {...}`: it would collide with the loader.
-- Verify after pushing: run `testConfig()` in the Apps Script editor.
+- Live settings live in `config.gs` inside the Apps Script project and are edited in
+  the Apps Script editor. It is never committed, because this repo is public.
+- `clasp push --force` makes Apps Script an exact copy of `src/`. A bare push from a
+  checkout without `src/config.js` (every cloud session) deletes the live settings.
+  `scripts/deploy.sh` pulls the live `config.gs` into `src/config.js` (gitignored)
+  first, and aborts if the pull fails or the config is missing.
+- The script also aborts if Apps Script holds files not in `src/` (a push would
+  delete them). Add them to the repo, delete them in the editor, or pass
+  `--allow-delete`.
+- Verify after deploying: run `testConfig()` in the Apps Script editor.
 
 ## Cloud Sessions (Claude Code on the web)
 
@@ -25,7 +31,7 @@ environment variables set in the cloud environment's settings:
 | `CLASPRC_B64` | base64 of `~/.clasprc.json` (the Google login). Secret. |
 | `CLASP_SCRIPT_ID` | The Apps Script project's script ID |
 
-If `clasp push` says "No credentials found", one of these is missing or invalid; check
+If clasp says "No credentials found", one of these is missing or invalid; check
 the hook's output. If the login expires, re-run `clasp login` on a computer and update
 `CLASPRC_B64`.
 
@@ -33,7 +39,7 @@ the hook's output. If the login expires, re-run `clasp login` on a computer and 
 
 | File | Pushed to Apps Script | Committed to Git |
 |------|----------------------|------------------|
-| `src/config.js` (loader only) | Yes | Yes |
+| `src/config.js` (live `config.gs`, pulled by deploy script) | Yes | No (gitignored) |
 | `src/hockey-sync.js` | Yes | Yes |
 | `src/f1-sync.js` | Yes | Yes |
 | `src/baseball-sync.js` | Yes | Yes |
@@ -50,15 +56,15 @@ work as a fallback. See `examples/sample-config.js`.
 
 ## If Config Gets Lost
 
-Settings live in Script Properties, which `clasp push` never touches. If
-`CONFIG_JSON` is deleted, re-create it from `examples/sample-config.js` (as JSON)
-under Project Settings > Script Properties.
+If `config.gs` is deleted from Apps Script, `scripts/deploy.sh` refuses to push.
+Re-create it in the editor from `examples/sample-config.js` with real values.
+Apps Script's Project History may also have the previous version.
 
 ## Deployment Commands
 
 ```bash
 # Push to Apps Script
-clasp push --force
+scripts/deploy.sh
 
 # Push to GitHub
 git add . && git commit -m "message" && git push
