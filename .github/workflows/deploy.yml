@@ -1,0 +1,61 @@
+# Deploys src/ to Google Apps Script whenever code lands on main.
+# Uses scripts/deploy.sh, which pulls the live config.gs first so the
+# settings are never overwritten or deleted.
+#
+# Requires two repository secrets (Settings > Secrets and variables > Actions):
+#   CLASPRC_B64      base64 of ~/.clasprc.json (the clasp Google login)
+#   CLASP_SCRIPT_ID  the Apps Script project's script ID
+name: Deploy to Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/deploy.sh'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-apps-script
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check secrets
+        env:
+          CLASPRC_B64: ${{ secrets.CLASPRC_B64 }}
+          CLASP_SCRIPT_ID: ${{ secrets.CLASP_SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_B64" ] || [ -z "$CLASP_SCRIPT_ID" ]; then
+            echo "::error::Add the CLASPRC_B64 and CLASP_SCRIPT_ID repository secrets (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - name: Install clasp
+        run: npm install -g @google/clasp@3.4.1
+
+      - name: Log in to clasp
+        env:
+          CLASPRC_B64: ${{ secrets.CLASPRC_B64 }}
+          CLASP_SCRIPT_ID: ${{ secrets.CLASP_SCRIPT_ID }}
+          CLAUDE_CODE_REMOTE: 'true'
+          CLAUDE_PROJECT_DIR: ${{ github.workspace }}
+        run: |
+          .claude/hooks/session-start.sh
+          test -f "$HOME/.clasprc.json" || { echo "::error::CLASPRC_B64 is not valid base64-encoded JSON."; exit 1; }
+
+      - name: Deploy
+        run: scripts/deploy.sh

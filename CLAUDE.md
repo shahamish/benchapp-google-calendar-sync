@@ -21,6 +21,19 @@ scripts/deploy.sh             # pull live config.gs, then push src/
   `--allow-delete`.
 - Verify after deploying: run `testConfig()` in the Apps Script editor.
 
+## Automatic Deploys
+
+`.github/workflows/deploy.yml` runs `scripts/deploy.sh` on every push to `main`
+that touches `src/`, the deploy script, or the workflow. So the normal flow is:
+change code on a branch, open a PR, merge it, and the merge deploys. Do not deploy
+from a feature branch; Apps Script should only run what is on `main`.
+It can also be run by hand from the Actions tab ("Run workflow").
+It uses repository secrets `CLASPRC_B64` and `CLASP_SCRIPT_ID` (same values as the
+cloud environment variables below).
+
+A PreToolUse hook (`.claude/hooks/block-bare-clasp-push.sh`) blocks any bare
+`clasp push` command in Claude Code sessions.
+
 ## Cloud Sessions (Claude Code on the web)
 
 `.claude/hooks/session-start.sh` runs at session start and prepares clasp from two
