@@ -42,8 +42,8 @@ Automatically synchronize your BenchApp hockey schedule with Google Calendar usi
    {
      "FAMILY_CALENDAR_ID": "your-actual-calendar@gmail.com",
      "HOCKEY_TEAMS": [
-       { "name": "Bodhi", "calendarUrl": "https://ics.benchapp.com/first-url",  "eventPrefix": "[Hockey - Bodhi] " },
-       { "name": "Milo",  "calendarUrl": "https://ics.benchapp.com/second-url", "eventPrefix": "[Hockey - Milo] " }
+       { "name": "Red", "calendarUrl": "https://ics.benchapp.com/first-url",  "eventPrefix": "[Hockey - Red] " },
+       { "name": "Blue",  "calendarUrl": "https://ics.benchapp.com/second-url", "eventPrefix": "[Hockey - Blue] " }
      ],
      "DAYS_LOOKBACK": 7,
      "DAYS_LOOKAHEAD": 90
@@ -90,7 +90,7 @@ This script solves that by automatically keeping everything in sync!
 
 | BenchApp Event | Google Calendar Result |
 |----------------|------------------------|
-| New game added | ➕ Event created with the team's prefix (e.g. `[Hockey - Bodhi]`) |
+| New game added | ➕ Event created with the team's prefix (e.g. `[Hockey - Red]`) |
 | Time changed | 📝 Existing event updated |
 | Game canceled | 🗑️ Event removed from calendar |
 | Location updated | 📍 Location synced automatically |
@@ -102,15 +102,15 @@ const CONFIG = {
   FAMILY_CALENDAR_ID: '',    // Target Google Calendar
   HOCKEY_TEAMS: [            // One entry per BenchApp team
     {
-      name: 'Bodhi',                         // Label used in logs
+      name: 'Red',                         // Label used in logs
       calendarUrl: '',                       // BenchApp ICS URL
-      eventPrefix: '[Hockey - Bodhi] ',      // Prefix for this team's events (unique per team)
+      eventPrefix: '[Hockey - Red] ',      // Prefix for this team's events (unique per team)
       legacyPrefixes: ['[Hockey] ']          // Optional: old prefixes to retitle in place
     },
     {
-      name: 'Milo',
+      name: 'Blue',
       calendarUrl: '',
-      eventPrefix: '[Hockey - Milo] '
+      eventPrefix: '[Hockey - Blue] '
     }
   ],
   DAYS_LOOKBACK: 7,         // How far back to sync
@@ -127,7 +127,7 @@ Events are matched to a team by their title prefix. If you rename a team's
 `eventPrefix`, list the old value in that team's `legacyPrefixes` so the next sync
 retitles the existing events in place instead of creating duplicates and leaving the
 old ones behind. Prefixes must not be a prefix of one another (for example
-`[Hockey] ` and `[Hockey] Milo ` would collide and the script refuses to run).
+`[Hockey] ` and `[Hockey] Blue ` would collide and the script refuses to run).
 
 ## 📁 File Structure
 
