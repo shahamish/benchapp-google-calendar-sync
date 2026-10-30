@@ -138,7 +138,9 @@ src/
 ```
 
 **For Google Apps Script:**
-- Deploy with `scripts/deploy.sh`. It pulls the live `config.gs` from Apps Script and
+- Merging to `main` deploys automatically through the GitHub Action in
+  `.github/workflows/deploy.yml` (needs the `CLASPRC_B64` and `CLASP_SCRIPT_ID`
+  repository secrets). To deploy by hand, use `scripts/deploy.sh`. It pulls the live `config.gs` from Apps Script and
   then pushes `src/`, so your settings are never overwritten or deleted.
 - Keep your real calendar IDs in `config.gs` in Apps Script only
 
